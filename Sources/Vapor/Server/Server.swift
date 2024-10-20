@@ -34,6 +34,7 @@ public protocol Server: Sendable {
 public enum BindAddress: Equatable, Sendable {
     case hostname(_ hostname: String?, port: Int?)
     case unixDomainSocket(path: String)
+    case vsock(cid: UInt32?, port: UInt32? = nil)
 }
 
 extension Server {
@@ -53,6 +54,8 @@ extension Server {
             try self.start(hostname: hostname, port: port)
         case .unixDomainSocket:
             throw ServerStartError.unsupportedAddress(message: "Starting with unix domain socket path not supported, \(Self.self) must implement start(address:).")
+        case .vsock:
+            throw ServerStartError.unsupportedAddress(message: "Starting with vsock not supported, \(Self.self) must implement start(address:).")
         }
     }
     
@@ -93,4 +96,3 @@ internal enum ServerStartError: Error {
     /// Incompatible flags were used together (for instance, specifying a socket path along with a port)
     case unsupportedAddress(message: String)
 }
-

@@ -74,6 +74,17 @@ public final class HTTPServer: Server, Sendable {
                 return "\(scheme)://\(hostname ?? Self.defaultHostname):\(port ?? Self.defaultPort)"
             case .unixDomainSocket(let socketPath):
                 return "\(scheme)+unix: \(socketPath)"
+            case .vsock(let cid, let port):
+                let cidInfo: String = switch cid {
+                case nil: "<any>"
+                case 0: "hypervisor"
+                case 1: "reserved"
+                case 2: "host"
+                default: "unknown"
+                }
+                let portInfo: String = port.flatMap { String($0) } ?? "<any>"
+
+                return "\(scheme)+vsock: \(cidInfo) (port: \(portInfo))"
             }
         }
         
@@ -275,7 +286,7 @@ public final class HTTPServer: Server, Sendable {
         case .hostname(let hostname, let port): 
             /// Override the hostname, port, neither, or both.
             configuration.address = .hostname(hostname ?? configuration.hostname, port: port ?? configuration.port)
-        case .unixDomainSocket: 
+        case .unixDomainSocket, .vsock:
             /// Override the socket path.
             configuration.address = address!
         }
@@ -321,7 +332,7 @@ public final class HTTPServer: Server, Sendable {
         case .hostname(let hostname, let port):
             /// Override the hostname, port, neither, or both.
             configuration.address = .hostname(hostname ?? configuration.hostname, port: port ?? configuration.port)
-        case .unixDomainSocket:
+        case .unixDomainSocket, .vsock:
             /// Override the socket path.
             configuration.address = address!
         }
@@ -493,6 +504,10 @@ private final class HTTPServerConnection: Sendable {
             channel = bootstrap.bind(host: configuration.hostname, port: configuration.port)
         case .unixDomainSocket(let socketPath):
             channel = bootstrap.bind(unixDomainSocketPath: socketPath)
+        case .vsock(let cidN, let portN):
+            let cid = cidN.flatMap { VsockAddress.ContextID(rawValue: $0) } ?? VsockAddress.ContextID.any
+            let port = portN.flatMap { VsockAddress.Port(rawValue: $0) } ?? VsockAddress.Port.any
+            channel = bootstrap.bind(to: VsockAddress(cid: cid, port: port))
         }
         
         return channel.map { channel in
